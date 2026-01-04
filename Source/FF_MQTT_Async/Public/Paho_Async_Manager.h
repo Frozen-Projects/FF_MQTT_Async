@@ -6,13 +6,13 @@
 #include "GameFramework/Actor.h"
 
 // Custom Includes.
-#include "MQTT_Includes.h"
+#include "Generic_Includes.h"
 #include "Paho_Async_Includes.h"
 
-#include "MQTT_Manager_Async.generated.h"
+#include "Paho_Async_Manager.generated.h"
 
 UCLASS()
-class FF_MQTT_ASYNC_API AMQTT_Manager_Paho_Async : public AActor
+class FF_MQTT_ASYNC_API APaho_Manager_Async : public AActor
 {
 	GENERATED_BODY()
 	
@@ -23,33 +23,57 @@ private:
 	MQTTAsync_SSLOptions SSL_Options;
 	FPahoClientParams Client_Params;
 
-#pragma region CALLBACKS
+#pragma region Internals
 
 	virtual bool SetSSLParams(FString In_Protocol, FPahoSslOptions In_Options);
 
+#pragma endregion Internals
+
+#pragma region Main_Callbacks
+
+	static void MessageDelivered(void* CallbackContext, MQTTAsync_token DeliveredToken);
+	static int MessageArrived(void* CallbackContext, char* TopicName, int TopicLenght, MQTTAsync_message* Message);
+	static void ConnectionLost(void* CallbackContext, char* Cause);
+
+#pragma endregion Main_Callbacks
+
+#pragma region V3_Callbacks
+
 	static void OnConnect(void* CallbackContext, MQTTAsync_successData* Response);
 	static void OnConnectFailure(void* CallbackContext, MQTTAsync_failureData* Response);
+	
 	static void OnDisconnect(void* CallbackContext, MQTTAsync_successData* Response);
 	static void OnDisconnectFailure(void* CallbackContext, MQTTAsync_failureData* Response);
+	
 	static void OnSend(void* CallbackContext, MQTTAsync_successData* Response);
 	static void OnSendFailure(void* CallbackContext, MQTTAsync_failureData* Response);
+	
 	static void OnUnSubscribe(void* CallbackContext, MQTTAsync_successData* Response);
 	static void OnUnSubscribeFailure(void* CallbackContext, MQTTAsync_failureData* Response);
 
+	static void OnSubscribe(void* CallbackContext, MQTTAsync_successData* Response);
+	static void OnSubscribeFailure(void* CallbackContext, MQTTAsync_failureData* Response);
+
+#pragma endregion V3_Callbacks
+
+#pragma region V5_Callbacks
+
 	static void OnConnect5(void* CallbackContext, MQTTAsync_successData5* Response);
 	static void OnConnectFailure5(void* CallbackContext, MQTTAsync_failureData5* Response);
+	
 	static void OnDisconnect5(void* CallbackContext, MQTTAsync_successData5* Response);
 	static void OnDisconnectFailure5(void* CallbackContext, MQTTAsync_failureData5* Response);
+	
 	static void OnSend5(void* CallbackContext, MQTTAsync_successData5* Response);
 	static void OnSendFailure5(void* CallbackContext, MQTTAsync_failureData5* Response);
+	
 	static void OnUnSubscribe5(void* CallbackContext, MQTTAsync_successData5* Response);
 	static void OnUnSubscribeFailure5(void* CallbackContext, MQTTAsync_failureData5* Response);
 
-	static void DeliveryCompleted(void* CallbackContext, MQTTAsync_token DeliveredToken);
-	static int MessageArrived(void* CallbackContext, char* TopicName, int TopicLenght, MQTTAsync_message* Message);
-	static void ConnectionLost(void* CallbackContext, char* Cause);
+	static void OnSubscribe5(void* CallbackContext, MQTTAsync_successData5* Response);
+	static void OnSubscribeFailure5(void* CallbackContext, MQTTAsync_failureData5* Response);
 	
-#pragma endregion CALLBACKS
+#pragma endregion V5_Callbacks
 
 protected:
 
@@ -62,37 +86,49 @@ protected:
 public:	
 
 	// Sets default values for this actor's properties.
-	AMQTT_Manager_Paho_Async();
+	APaho_Manager_Async();
 
 	// Called every frame.
 	virtual void Tick(float DeltaTime) override;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_Delivered Delegate_Delivered;
+	FDelegate_Paho_Int Delegate_Message_Delivered;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_Arrived Delegate_Arrived;
+	FDelegate_Paho_Json Delegate_Message_Arrived;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_Lost Delegate_Lost;
+	FDelegate_Paho_String Delegate_Connection_Lost;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_OnConnect Delegate_OnConnect;
+	FDelegate_Paho_Json Delegate_OnConnect;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_OnConnectFailure Delegate_OnConnectFailure;
+	FDelegate_Paho_Json Delegate_OnConnect_Failure;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_OnDisconnect Delegate_OnDisconnect;
+	FDelegate_Paho_Json Delegate_OnDisconnect;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_OnDisconnectFailure Delegate_OnDisconnectFailure;
+	FDelegate_Paho_Json Delegate_OnDisconnect_Failure;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_OnSend Delegate_OnSend;
+	FDelegate_Paho_Json Delegate_OnSend;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_OnSendFailure Delegate_OnSendFailure;
+	FDelegate_Paho_Json Delegate_OnSend_Failure;
+
+	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
+	FDelegate_Paho_Json Delegate_OnUnSubscribe;
+
+	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
+	FDelegate_Paho_Json Delegate_OnUnSubscribe_Failure;
+
+	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
+	FDelegate_Paho_Json Delegate_OnSubscribe;
+
+	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
+	FDelegate_Paho_Json Delegate_OnSubscribe_Failure;
 
 	UFUNCTION(BlueprintPure, Category = "Frozen Forest|MQTT|Client|Paho C", meta = (DisplayName = "MQTT Async - Get Client Parameters"))
 	virtual FPahoClientParams GetClientParams();
