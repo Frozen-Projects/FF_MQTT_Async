@@ -1,5 +1,3 @@
-// Some copyright should be here...
-
 using System;
 using System.IO;
 using UnrealBuildTool;
@@ -17,10 +15,8 @@ public class FF_MQTT_Async : ModuleRules
 			new string[]
 			{
 				"Core",
-                "OpenSSL",
                 "FF_MQTT_Sync",
-            }
-			);
+            });
 			
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
@@ -33,14 +29,6 @@ public class FF_MQTT_Async : ModuleRules
                 "JsonUtilities",
                 "JsonBlueprintUtilities",
                 "paho_c_async",
-            }
-			);
-		
-		DynamicallyLoadedModuleNames.AddRange(
-			new string[]
-			{
-
-			}
-			);
+            });
 	}
 }
