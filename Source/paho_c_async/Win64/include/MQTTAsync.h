@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2009, 2023 IBM Corp., Ian Craggs and others
+ * Copyright (c) 2009, 2025 IBM Corp., Ian Craggs and others
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
@@ -29,9 +29,11 @@
  * @cond MQTTAsync_main
  * @mainpage Asynchronous MQTT client library for C (MQTTAsync)
  *
- * &copy; Copyright 2009, 2023 IBM Corp., Ian Craggs and others
+ * &copy; Copyright 2009, 2025 IBM Corp., Ian Craggs and others.
  *
  * @brief An Asynchronous MQTT client library for C.
+ *
+ * Version 1.3.15
  *
  * An MQTT client application connects to MQTT-capable servers.
  * A typical client is responsible for collecting information from a telemetry
@@ -78,6 +80,7 @@
  * <li>@ref tracing</li>
  * <li>@ref auto_reconnect</li>
  * <li>@ref offline_publish</li>
+ * <li>@ref HTTP_proxies</li>
  * </ul>
  * @endcond
  */
@@ -104,6 +107,8 @@
 #include "MQTTSubscribeOpts.h"
 #if !defined(NO_PERSISTENCE)
 #include "MQTTClientPersistence.h"
+#else
+#define MQTTCLIENT_PERSISTENCE_NONE 1
 #endif
 
 /**
@@ -172,11 +177,11 @@
 /**
  * Return code: protocol prefix in serverURI should be:
  * @li @em tcp:// or @em mqtt:// - Insecure TCP
- * @li @em ssl:// or @em mqtts:// - Encrypted SSL/TLS
+ * @li @em ssl:// or @em tls:// or @em mqtts:// - Encrypted SSL/TLS
  * @li @em ws:// - Insecure websockets
  * @li @em wss:// - Secure web sockets
  *
- * The TLS enabled prefixes (ssl, mqtts, wss) are only valid if the TLS
+ * The TLS enabled prefixes (ssl, tls, mqtts, wss) are only valid if the TLS
  * version of the library is linked with.
  */
 #define MQTTASYNC_BAD_PROTOCOL -14
@@ -344,16 +349,16 @@ typedef struct
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * MQTTAsync_setCallbacks(), which contains any application-specific context.
- *  topicName The topic associated with the received message.
- *  topicLen The length of the topic if there are one
+ * @param topicName The topic associated with the received message.
+ * @param topicLen The length of the topic if there are one
  * more NULL characters embedded in <i>topicName</i>, otherwise <i>topicLen</i>
  * is 0. If <i>topicLen</i> is 0, the value returned by <i>strlen(topicName)</i>
  * can be trusted. If <i>topicLen</i> is greater than 0, the full topic name
  * can be retrieved by accessing <i>topicName</i> as a byte array of length
  * <i>topicLen</i>.
- *  message The MQTTAsync_message structure for the received message.
+ * @param message The MQTTAsync_message structure for the received message.
  * This structure contains the message payload and attributes.
  * @return This function must return 0 or 1 indicating whether or not
  * the message has been safely received by the client application. <br>
@@ -381,9 +386,9 @@ typedef int MQTTAsync_messageArrived(void* context, char* topicName, int topicLe
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * MQTTAsync_setCallbacks(), which contains any application-specific context.
- *  token The ::MQTTAsync_token associated with
+ * @param token The ::MQTTAsync_token associated with
  * the published message. Applications can check that all messages have been
  * correctly published by matching the tokens returned from calls to
  * MQTTAsync_send() and MQTTAsync_sendMessage() with the tokens passed
@@ -404,9 +409,9 @@ typedef void MQTTAsync_deliveryComplete(void* context, MQTTAsync_token token);
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * MQTTAsync_setCallbacks(), which contains any application-specific context.
- *  cause The reason for the disconnection.
+ * @param cause The reason for the disconnection.
  * Currently, <i>cause</i> is always set to NULL.
  */
 typedef void MQTTAsync_connectionLost(void* context, char* cause);
@@ -422,9 +427,9 @@ typedef void MQTTAsync_connectionLost(void* context, char* cause);
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * MQTTAsync_setCallbacks(), which contains any application-specific context.
- *  cause The reason for the disconnection.
+ * @param cause The reason for the disconnection.
  * Currently, <i>cause</i> is always set to NULL.
  */
 typedef void MQTTAsync_connected(void* context, char* cause);
@@ -435,26 +440,25 @@ typedef void MQTTAsync_connected(void* context, char* cause);
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * MQTTAsync_setCallbacks(), which contains any application-specific context.
- *  properties the properties in the disconnect packet.
- *  properties the reason code from the disconnect packet
- * Currently, <i>cause</i> is always set to NULL.
+ * @param properties the properties in the disconnect packet.
+ * @param reasonCode the reason code from the disconnect packet
  */
 typedef void MQTTAsync_disconnected(void* context, MQTTProperties* properties,
 		enum MQTTReasonCodes reasonCode);
 
 /**
  * Sets the MQTTAsync_disconnected() callback function for a client.
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to any application-specific context. The
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed to each of the callback functions to
  * provide access to the context information in the callback.
- *  co A pointer to an MQTTAsync_connected() callback
+ * @param co A pointer to an MQTTAsync_connected() callback
  * function.  NULL removes the callback setting.
  * @return ::MQTTASYNC_SUCCESS if the callbacks were correctly set,
  * ::MQTTASYNC_FAILURE if an error occurred.
@@ -491,29 +495,30 @@ typedef struct
 /**
  * This is a callback function which will allow the client application to update the 
  * connection data.
- *  data The connection data which can be modified by the application.
+ * @param data The connection data which can be modified by the application.
  * @return Return a non-zero value to update the connect data, zero to keep the same data.
  */
 typedef int MQTTAsync_updateConnectOptions(void* context, MQTTAsync_connectData* data);
 
 /**
  * Sets the MQTTAsync_updateConnectOptions() callback function for a client.
- *  handle A valid client handle from a successful call to MQTTAsync_create().
- *  context A pointer to any application-specific context. The
+ * @param handle A valid client handle from a successful call to MQTTAsync_create().
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed to each of the callback functions to
  * provide access to the context information in the callback.
- *  co A pointer to an MQTTAsync_updateConnectOptions() callback
+ * @param co A pointer to an MQTTAsync_updateConnectOptions() callback
  * function.  NULL removes the callback setting.
  */
 LIBMQTT_API int MQTTAsync_setUpdateConnectOptions(MQTTAsync handle, void* context, MQTTAsync_updateConnectOptions* co);
 
+#if !defined(NO_PERSISTENCE)
 /**
  * Sets the MQTTPersistence_beforeWrite() callback function for a client.
- *  handle A valid client handle from a successful call to MQTTAsync_create().
- *  context A pointer to any application-specific context. The
+ * @param handle A valid client handle from a successful call to MQTTAsync_create().
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed to the callback function to
  * provide access to the context information in the callback.
- *  co A pointer to an MQTTPersistence_beforeWrite() callback
+ * @param co A pointer to an MQTTPersistence_beforeWrite() callback
  * function.  NULL removes the callback setting.
  */
 LIBMQTT_API int MQTTAsync_setBeforePersistenceWrite(MQTTAsync handle, void* context, MQTTPersistence_beforeWrite* co);
@@ -521,15 +526,15 @@ LIBMQTT_API int MQTTAsync_setBeforePersistenceWrite(MQTTAsync handle, void* cont
 
 /**
  * Sets the MQTTPersistence_afterRead() callback function for a client.
- *  handle A valid client handle from a successful call to MQTTAsync_create().
- *  context A pointer to any application-specific context. The
+ * @param handle A valid client handle from a successful call to MQTTAsync_create().
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed to the callback function to
  * provide access to the context information in the callback.
- *  co A pointer to an MQTTPersistence_beforeWrite() callback
+ * @param co A pointer to an MQTTPersistence_beforeWrite() callback
  * function.  NULL removes the callback setting.
  */
 LIBMQTT_API int MQTTAsync_setAfterPersistenceRead(MQTTAsync handle, void* context, MQTTPersistence_afterRead* co);
-
+#endif
 
 /** The data returned on completion of an unsuccessful API call in the response callback onFailure. */
 typedef struct
@@ -648,9 +653,9 @@ typedef struct
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * ::MQTTAsync_responseOptions, which contains any application-specific context.
- *  response Any success data associated with the API completion.
+ * @param response Any success data associated with the API completion.
  */
 typedef void MQTTAsync_onSuccess(void* context, MQTTAsync_successData* response);
 
@@ -664,9 +669,9 @@ typedef void MQTTAsync_onSuccess(void* context, MQTTAsync_successData* response)
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * ::MQTTAsync_responseOptions, which contains any application-specific context.
- *  response Any success data associated with the API completion.
+ * @param response Any success data associated with the API completion.
  */
 typedef void MQTTAsync_onSuccess5(void* context, MQTTAsync_successData5* response);
 
@@ -679,9 +684,9 @@ typedef void MQTTAsync_onSuccess5(void* context, MQTTAsync_successData5* respons
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * ::MQTTAsync_responseOptions, which contains any application-specific context.
- *  response Failure data associated with the API completion.
+ * @param response Failure data associated with the API completion.
  */
 typedef void MQTTAsync_onFailure(void* context,  MQTTAsync_failureData* response);
 
@@ -694,9 +699,9 @@ typedef void MQTTAsync_onFailure(void* context,  MQTTAsync_failureData* response
  *
  * <b>Note:</b> Neither MQTTAsync_create() nor MQTTAsync_destroy() should be
  * called within this callback.
- *  context A pointer to the <i>context</i> value originally passed to
+ * @param context A pointer to the <i>context</i> value originally passed to
  * ::MQTTAsync_responseOptions, which contains any application-specific context.
- *  response Failure data associated with the API completion.
+ * @param response Failure data associated with the API completion.
  */
 typedef void MQTTAsync_onFailure5(void* context,  MQTTAsync_failureData5* response);
 
@@ -777,27 +782,26 @@ typedef struct MQTTAsync_responseOptions MQTTAsync_callOptions;
 /**
  * This function sets the global callback functions for a specific client.
  * If your client application doesn't use a particular callback, set the
- * relevant parameter to NULL. Any necessary message acknowledgements and
- * status communications are handled in the background without any intervention
- * from the client application.  If you do not set a messageArrived callback
- * function, you will not be notified of the receipt of any messages as a
- * result of a subscription.
+ * relevant parameter to NULL (except for message arrived, which must be given).
+ * Any necessary message acknowledgements and status communications are handled
+ * in the background without any intervention
+ * from the client application.
  *
  * <b>Note:</b> The MQTT client must be disconnected when this function is
  * called.
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
- *  context A pointer to any application-specific context. The
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed to each of the callback functions to
  * provide access to the context information in the callback.
- *  cl A pointer to an MQTTAsync_connectionLost() callback
+ * @param cl A pointer to an MQTTAsync_connectionLost() callback
  * function. You can set this to NULL if your application doesn't handle
  * disconnections.
- *  ma A pointer to an MQTTAsync_messageArrived() callback
+ * @param ma A pointer to an MQTTAsync_messageArrived() callback
  * function.  If this callback is not set, an error will be returned.
  * You must set this callback because otherwise there would be
  * no way to deliver any incoming messages.
- *  dc A pointer to an MQTTAsync_deliveryComplete() callback
+ * @param dc A pointer to an MQTTAsync_deliveryComplete() callback
  * function. You can set this to NULL if you do not want to check
  * for successful delivery.
  * @return ::MQTTASYNC_SUCCESS if the callbacks were correctly set,
@@ -814,12 +818,12 @@ LIBMQTT_API int MQTTAsync_setCallbacks(MQTTAsync handle, void* context, MQTTAsyn
  *
  * <b>Note:</b> The MQTT client must be disconnected when this function is
  * called.
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
- *  context A pointer to any application-specific context. The
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed the callback functions to provide
  * access to the context information in the callback.
- *  cl A pointer to an MQTTAsync_connectionLost() callback
+ * @param cl A pointer to an MQTTAsync_connectionLost() callback
  * function. You can set this to NULL if your application doesn't handle
  * disconnections.
  * @return ::MQTTASYNC_SUCCESS if the callbacks were correctly set,
@@ -839,12 +843,12 @@ LIBMQTT_API int MQTTAsync_setConnectionLostCallback(MQTTAsync handle, void* cont
  *
  * <b>Note:</b> The MQTT client must be disconnected when this function is
  * called.
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
- *  context A pointer to any application-specific context. The
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed to the callback functions to provide
  * access to the context information in the callback.
- *  ma A pointer to an MQTTAsync_messageArrived() callback
+ * @param ma A pointer to an MQTTAsync_messageArrived() callback
  * function.  You can set this to NULL if your application doesn't handle
  * receipt of messages.
  * @return ::MQTTASYNC_SUCCESS if the callbacks were correctly set,
@@ -861,12 +865,12 @@ LIBMQTT_API int MQTTAsync_setMessageArrivedCallback(MQTTAsync handle, void* cont
  *
  * <b>Note:</b> The MQTT client must be disconnected when this function is
  * called.
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
- *  context A pointer to any application-specific context. The
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed to the callback functions to provide
  * access to the context information in the callback.
- *  dc A pointer to an MQTTAsync_deliveryComplete() callback
+ * @param dc A pointer to an MQTTAsync_deliveryComplete() callback
  * function. You can set this to NULL if you do not want to check
  * for successful delivery.
  * @return ::MQTTASYNC_SUCCESS if the callbacks were correctly set,
@@ -877,12 +881,12 @@ LIBMQTT_API int MQTTAsync_setDeliveryCompleteCallback(MQTTAsync handle, void* co
 
 /**
  * Sets the MQTTAsync_connected() callback function for a client.
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
- *  context A pointer to any application-specific context. The
+ * @param context A pointer to any application-specific context. The
  * the <i>context</i> pointer is passed to each of the callback functions to
  * provide access to the context information in the callback.
- *  co A pointer to an MQTTAsync_connected() callback
+ * @param co A pointer to an MQTTAsync_connected() callback
  * function.  NULL removes the callback setting.
  * @return ::MQTTASYNC_SUCCESS if the callbacks were correctly set,
  * ::MQTTASYNC_FAILURE if an error occurred.
@@ -893,7 +897,7 @@ LIBMQTT_API int MQTTAsync_setConnected(MQTTAsync handle, void* context, MQTTAsyn
 /**
  * Reconnects a client with the previously used connect options.  Connect
  * must have previously been called for this to work.
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
  * @return ::MQTTASYNC_SUCCESS if the callbacks were correctly set,
  * ::MQTTASYNC_FAILURE if an error occurred.
@@ -905,10 +909,10 @@ LIBMQTT_API int MQTTAsync_reconnect(MQTTAsync handle);
  * This function creates an MQTT client ready for connection to the
  * specified server and using the specified persistent storage (see
  * MQTTAsync_persistence). See also MQTTAsync_destroy().
- *  handle A pointer to an ::MQTTAsync handle. The handle is
+ * @param handle A pointer to an ::MQTTAsync handle. The handle is
  * populated with a valid client reference following a successful return from
  * this function.
- *  serverURI A null-terminated string specifying the server to
+ * @param serverURI A null-terminated string specifying the server to
  * which the client will connect. It takes the form
  * <i>protocol://host:port</i> where <i>protocol</i> must be:
  * <br>
@@ -925,9 +929,9 @@ LIBMQTT_API int MQTTAsync_reconnect(MQTTAsync handle);
  * For <i>host</i>, you can specify either an IP address or a host name. For
  * instance, to connect to a server running on the local machines with the
  * default MQTT port, specify <i>tcp://localhost:1883</i>.
- *  clientId The client identifier passed to the server when the
+ * @param clientId The client identifier passed to the server when the
  * client connects to it. It is a null-terminated UTF-8 encoded string.
- *  persistence_type The type of persistence to be used by the client:
+ * @param persistence_type The type of persistence to be used by the client:
  * <br>
  * ::MQTTCLIENT_PERSISTENCE_NONE: Use in-memory persistence. If the device or
  * system on which the client is running fails or is switched off, the current
@@ -943,7 +947,7 @@ LIBMQTT_API int MQTTAsync_reconnect(MQTTAsync handle);
  * implementation. Using this type of persistence gives control of the
  * persistence mechanism to the application. The application has to implement
  * the MQTTClient_persistence interface.
- *  persistence_context If the application uses
+ * @param persistence_context If the application uses
  * ::MQTTCLIENT_PERSISTENCE_NONE persistence, this argument is unused and should
  * be set to NULL. For ::MQTTCLIENT_PERSISTENCE_DEFAULT persistence, it
  * should be set to the location of the persistence directory (if set
@@ -1371,11 +1375,13 @@ typedef struct
 	 */
 	const MQTTAsync_nameValue* httpHeaders;
 	/**
-	 * HTTP proxy
-	 */
+	* The string value of the HTTP proxy. Examples:
+    *  - http://your.proxy.server:8080/
+    *  - http://user:pass@my.proxy.server:8080/
+	*/
 	const char* httpProxy;
 	/**
-	 * HTTPS proxy
+	 * HTTPS proxy setting. See ::MQTTAsync_connectOptions.httpProxy and the section @ref HTTP_proxies.
 	 */
 	const char* httpsProxy;
 } MQTTAsync_connectOptions;
@@ -1406,9 +1412,9 @@ NULL, NULL, NULL, NULL, 0, NULL, MQTTVERSION_5, 0, 1, 60, {0, NULL}, 1, NULL, NU
   * MQTTAsync_create()) to an MQTT server using the specified options. If you
   * want to enable asynchronous message and status notifications, you must call
   * MQTTAsync_setCallbacks() prior to MQTTAsync_connect().
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  options A pointer to a valid MQTTAsync_connectOptions
+  * @param options A pointer to a valid MQTTAsync_connectOptions
   * structure.
   * @return ::MQTTASYNC_SUCCESS if the client connect request was accepted.
   * If the client was unable to connect to the server, an error code is
@@ -1491,9 +1497,9 @@ typedef struct
   * messages which have not completed will be retried depending on the
   * cleansession settings for both the previous and the new connection (see
   * MQTTAsync_connectOptions.cleansession and MQTTAsync_connect()).
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  options The client delays disconnection for up to this time (in
+  * @param options The client delays disconnection for up to this time (in
   * milliseconds) in order to allow in-flight message transfers to complete.
   * @return ::MQTTASYNC_SUCCESS if the client successfully disconnects from
   * the server. An error code is returned if the client was unable to disconnect
@@ -1505,7 +1511,7 @@ LIBMQTT_API int MQTTAsync_disconnect(MQTTAsync handle, const MQTTAsync_disconnec
 /**
   * This function allows the client application to test whether or not a
   * client is currently connected to the MQTT server.
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
   * @return Boolean true if the client is connected, otherwise false.
   */
@@ -1517,11 +1523,11 @@ LIBMQTT_API int MQTTAsync_isConnected(MQTTAsync handle);
   * contain wildcards (see @ref wildcard). This call also specifies the
   * @ref qos requested for the subscription
   * (see also MQTTAsync_subscribeMany()).
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  topic The subscription topic, which may include wildcards.
-  *  qos The requested quality of service for the subscription.
-  *  response A pointer to a response options structure. Used to set callback functions.
+  * @param topic The subscription topic, which may include wildcards.
+  * @param qos The requested quality of service for the subscription.
+  * @param response A pointer to a response options structure. Used to set callback functions.
   * @return ::MQTTASYNC_SUCCESS if the subscription request is successful.
   * An error code is returned if there was a problem registering the
   * subscription.
@@ -1533,15 +1539,15 @@ LIBMQTT_API int MQTTAsync_subscribe(MQTTAsync handle, const char* topic, int qos
   * This function attempts to subscribe a client to a list of topics, which may
   * contain wildcards (see @ref wildcard). This call also specifies the
   * @ref qos requested for each topic (see also MQTTAsync_subscribe()).
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  count The number of topics for which the client is requesting
+  * @param count The number of topics for which the client is requesting
   * subscriptions.
-  *  topic An array (of length <i>count</i>) of pointers to
+  * @param topic An array (of length <i>count</i>) of pointers to
   * topics, each of which may include wildcards.
-  *  qos An array (of length <i>count</i>) of @ref qos
+  * @param qos An array (of length <i>count</i>) of @ref qos
   * values. qos[n] is the requested QoS for topic[n].
-  *  response A pointer to a response options structure. Used to set callback functions.
+  * @param response A pointer to a response options structure. Used to set callback functions.
   * @return ::MQTTASYNC_SUCCESS if the subscription request is successful.
   * An error code is returned if there was a problem registering the
   * subscriptions.
@@ -1551,11 +1557,11 @@ LIBMQTT_API int MQTTAsync_subscribeMany(MQTTAsync handle, int count, char* const
 /**
   * This function attempts to remove an existing subscription made by the
   * specified client.
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  topic The topic for the subscription to be removed, which may
+  * @param topic The topic for the subscription to be removed, which may
   * include wildcards (see @ref wildcard).
-  *  response A pointer to a response options structure. Used to set callback functions.
+  * @param response A pointer to a response options structure. Used to set callback functions.
   * @return ::MQTTASYNC_SUCCESS if the subscription is removed.
   * An error code is returned if there was a problem removing the
   * subscription.
@@ -1565,12 +1571,12 @@ LIBMQTT_API int MQTTAsync_unsubscribe(MQTTAsync handle, const char* topic, MQTTA
 /**
   * This function attempts to remove existing subscriptions to a list of topics
   * made by the specified client.
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  count The number subscriptions to be removed.
-  *  topic An array (of length <i>count</i>) of pointers to the topics of
+  * @param count The number subscriptions to be removed.
+  * @param topic An array (of length <i>count</i>) of pointers to the topics of
   * the subscriptions to be removed, each of which may include wildcards.
-  *  response A pointer to a response options structure. Used to set callback functions.
+  * @param response A pointer to a response options structure. Used to set callback functions.
   * @return ::MQTTASYNC_SUCCESS if the subscriptions are removed.
   * An error code is returned if there was a problem removing the subscriptions.
   */
@@ -1584,14 +1590,14 @@ LIBMQTT_API int MQTTAsync_unsubscribeMany(MQTTAsync handle, int count, char* con
   * If the client application needs to
   * test for successful delivery of messages, a callback should be set
   * (see ::MQTTAsync_onSuccess() and ::MQTTAsync_deliveryComplete()).
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  destinationName The topic associated with this message.
-  *  payloadlen The length of the payload in bytes.
-  *  payload A pointer to the byte array payload of the message.
-  *  qos The @ref qos of the message.
-  *  retained The retained flag for the message.
-  *  response A pointer to an ::MQTTAsync_responseOptions structure. Used to set callback functions.
+  * @param destinationName The topic associated with this message.
+  * @param payloadlen The length of the payload in bytes.
+  * @param payload A pointer to the byte array payload of the message.
+  * @param qos The @ref qos of the message.
+  * @param retained The retained flag for the message.
+  * @param response A pointer to an ::MQTTAsync_responseOptions structure. Used to set callback functions.
   * This is optional and can be set to NULL.
   * @return ::MQTTASYNC_SUCCESS if the message is accepted for publication.
   * An error code is returned if there was a problem accepting the message.
@@ -1606,12 +1612,12 @@ LIBMQTT_API int MQTTAsync_send(MQTTAsync handle, const char* destinationName, in
   * If the client application needs to
   * test for successful delivery of messages, a callback should be set
   * (see ::MQTTAsync_onSuccess() and ::MQTTAsync_deliveryComplete()).
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  destinationName The topic associated with this message.
-  *  msg A pointer to a valid MQTTAsync_message structure containing
+  * @param destinationName The topic associated with this message.
+  * @param msg A pointer to a valid MQTTAsync_message structure containing
   * the payload and attributes of the message to be published.
-  *  response A pointer to an ::MQTTAsync_responseOptions structure. Used to set callback functions.
+  * @param response A pointer to an ::MQTTAsync_responseOptions structure. Used to set callback functions.
   * @return ::MQTTASYNC_SUCCESS if the message is accepted for publication.
   * An error code is returned if there was a problem accepting the message.
   */
@@ -1625,9 +1631,9 @@ LIBMQTT_API int MQTTAsync_sendMessage(MQTTAsync handle, const char* destinationN
   * <b>Important note:</b> The memory used to hold the array of tokens is
   * malloc()'d in this function. The client application is responsible for
   * freeing this memory when it is no longer required.
-  *  handle A valid client handle from a successful call to
+  * @param handle A valid client handle from a successful call to
   * MQTTAsync_create().
-  *  tokens The address of a pointer to an ::MQTTAsync_token.
+  * @param tokens The address of a pointer to an ::MQTTAsync_token.
   * When the function returns successfully, the pointer is set to point to an
   * array of tokens representing messages pending completion. The last member of
   * the array is set to -1 to indicate there are no more tokens. If no tokens
@@ -1641,9 +1647,9 @@ LIBMQTT_API int MQTTAsync_getPendingTokens(MQTTAsync handle, MQTTAsync_token **t
 /**
  * Tests whether a request corresponding to a token is complete.
  *
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
- *  token An ::MQTTAsync_token associated with a request.
+ * @param token An ::MQTTAsync_token associated with a request.
  * @return 1 if the request has been completed, 0 if not.
  */
 #define MQTTASYNC_TRUE 1
@@ -1655,10 +1661,10 @@ LIBMQTT_API int MQTTAsync_isComplete(MQTTAsync handle, MQTTAsync_token token);
  * messages with QoS greater than 0.  A QoS 0 message has no MQTT token.
  * This function will always return ::MQTTASYNC_SUCCESS for a QoS 0 message.
  *
- *  handle A valid client handle from a successful call to
+ * @param handle A valid client handle from a successful call to
  * MQTTAsync_create().
- *  token An ::MQTTAsync_token associated with a request.
- *  timeout the maximum time to wait for completion, in milliseconds
+ * @param token An ::MQTTAsync_token associated with a request.
+ * @param timeout the maximum time to wait for completion, in milliseconds
  * @return ::MQTTASYNC_SUCCESS if the request has been completed in the time allocated,
  *  ::MQTTASYNC_FAILURE or ::MQTTASYNC_DISCONNECTED if not.
  */
@@ -1672,7 +1678,7 @@ LIBMQTT_API int MQTTAsync_waitForCompletion(MQTTAsync handle, MQTTAsync_token to
   * note:</b> This function does not free the memory allocated to a message
   * topic string. It is the responsibility of the client application to free
   * this memory using the MQTTAsync_free() library function.
-  *  msg The address of a pointer to the ::MQTTAsync_message structure
+  * @param msg The address of a pointer to the ::MQTTAsync_message structure
   * to be freed.
   */
 LIBMQTT_API void MQTTAsync_freeMessage(MQTTAsync_message** msg);
@@ -1683,7 +1689,7 @@ LIBMQTT_API void MQTTAsync_freeMessage(MQTTAsync_message** msg);
   * program have been compiled with different versions of the C compiler.  It is
   * thus good policy to always use this function when freeing any MQTT C client-
   * allocated memory.
-  *  ptr The pointer to the client library storage to be freed.
+  * @param ptr The pointer to the client library storage to be freed.
   */
 LIBMQTT_API void MQTTAsync_free(void* ptr);
 
@@ -1692,7 +1698,7 @@ LIBMQTT_API void MQTTAsync_free(void* ptr);
   * especially the data in the ::MQTTPersistence_afterRead and ::MQTTPersistence_beforeWrite
   * callbacks. This is needed on Windows when the client library and application
   * program have been compiled with different versions of the C compiler.
-  *  size The size of the memory to be allocated.
+  * @param size The size of the memory to be allocated.
   */
 LIBMQTT_API void* MQTTAsync_malloc(size_t size);
 
@@ -1700,7 +1706,7 @@ LIBMQTT_API void* MQTTAsync_malloc(size_t size);
   * This function frees the memory allocated to an MQTT client (see
   * MQTTAsync_create()). It should be called when the client is no longer
   * required.
-  *  handle A pointer to the handle referring to the ::MQTTAsync
+  * @param handle A pointer to the handle referring to the ::MQTTAsync
   * structure to be freed.
   */
 LIBMQTT_API void MQTTAsync_destroy(MQTTAsync* handle);
@@ -1722,7 +1728,7 @@ enum MQTTASYNC_TRACE_LEVELS
 /**
   * This function sets the level of trace information which will be
   * returned in the trace callback.
-  *  level the trace level required
+  * @param level the trace level required
   */
 LIBMQTT_API void MQTTAsync_setTraceLevel(enum MQTTASYNC_TRACE_LEVELS level);
 
@@ -1731,8 +1737,8 @@ LIBMQTT_API void MQTTAsync_setTraceLevel(enum MQTTASYNC_TRACE_LEVELS level);
   * This is a callback function prototype which must be implemented if you want
   * to receive trace information. Do not invoke any other Paho API calls in this
   * callback function - unpredictable behavior may result.
-  *  level the trace level of the message returned
-  *  message the trace message.  This is a pointer to a static buffer which
+  * @param level the trace level of the message returned
+  * @param message the trace message.  This is a pointer to a static buffer which
   * will be overwritten on each call.  You must copy the data if you want to keep
   * it for later.
   */
@@ -1742,7 +1748,7 @@ typedef void MQTTAsync_traceCallback(enum MQTTASYNC_TRACE_LEVELS level, char* me
   * This function sets the trace callback if needed.  If set to NULL,
   * no trace information will be returned.  The default trace level is
   * MQTTASYNC_TRACE_MINIMUM.
-  *  callback a pointer to the function which will handle the trace information
+  * @param callback a pointer to the function which will handle the trace information
   */
 LIBMQTT_API void MQTTAsync_setTraceCallback(MQTTAsync_traceCallback* callback);
 
@@ -1757,7 +1763,7 @@ LIBMQTT_API MQTTAsync_nameValue* MQTTAsync_getVersionInfo(void);
 /**
  * Returns a pointer to a string representation of the error code, or NULL.
  * Do not free after use. Returns NULL if the error code is unknown.
- *  code the MQTTASYNC_ return code.
+ * @param code the MQTTASYNC_ return code.
  * @return a static string representation of the error code.
  */
 LIBMQTT_API const char* MQTTAsync_strerror(int code);
@@ -1922,7 +1928,7 @@ LIBMQTT_API const char* MQTTAsync_strerror(int code);
 #include <OsWrapper.h>
 #endif
 
-#define ADDRESS     "tcp://mqtt.eclipseprojects.io:1883"
+#define ADDRESS     "tcp://test.mosquitto.org:1883"
 #define CLIENTID    "ExampleClientPub"
 #define TOPIC       "MQTT Examples"
 #define PAYLOAD     "Hello World!"
@@ -2093,7 +2099,7 @@ int main(int argc, char* argv[])
 #include <OsWrapper.h>
 #endif
 
-#define ADDRESS     "tcp://mqtt.eclipseprojects.io:1883"
+#define ADDRESS     "tcp://test.mosquitto.org:1883"
 #define CLIENTID    "ExampleClientSub"
 #define TOPIC       "MQTT Examples"
 #define PAYLOAD     "Hello World!"
@@ -2374,6 +2380,21 @@ exit:
     20130528 163909.209 Heap scan end
   * @endcode
   * @endcond
+  *
+√* @page HTTP_proxies HTTP Proxies
+  * The use of HTTP proxies can be controlled by environment variables or API calls.
+  *
+  * The ::MQTTAsync_connectOptions.httpProxy and ::MQTTAsync_connectOptions.httpsProxy fields
+  * of the ::MQTTAsync_connectOptions structure override any settings in the environment.
+  *
+  * If the environment variable PAHO_C_CLIENT_USE_HTTP_PROXY is set to TRUE, then the
+  * http_proxy or https_proxy (lower case only) environment variables are used, for plain
+  * TCP and TLS-secured connections respectively.
+  *
+  * The no_proxy environment variable can be used to exclude certain hosts from using an
+  * environment variable chosen proxy. This does not apply to a proxy selected through the API.
+  * The no_proxy environment variable is lower case only, and is a list of comma-separated
+  * hostname:port values. Suffixes are matched (e.g. example.com will match test.example.com).
   */
 
 #if defined(__cplusplus)
