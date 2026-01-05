@@ -70,10 +70,13 @@ void APaho_Manager_Async::MessageDelivered(void* CallbackContext, MQTTAsync_toke
 
 int APaho_Manager_Async::MessageArrived(void* CallbackContext, char* TopicName, int TopicLenght, MQTTAsync_message* Message)
 {
+	const FString TopicNameStr = StringCast<UTF8CHAR>(TopicName).Get();
+	const FString PayloadStr = StringCast<UTF8CHAR>((const char*)Message->payload).Get();
+
 	FJsonObjectWrapper Arrived;
-	Arrived.JsonObject->SetStringField("TopicName", StringCast<TCHAR>(TopicName).Get());
+	Arrived.JsonObject->SetStringField("TopicName", TopicNameStr);
 	Arrived.JsonObject->SetNumberField("TopicLength", TopicLenght);
-	Arrived.JsonObject->SetStringField("Message", StringCast<TCHAR>((char*)Message->payload).Get());
+	Arrived.JsonObject->SetStringField("Message", PayloadStr);
 
 	MQTTAsync_freeMessage(&Message);
 	MQTTAsync_free(TopicName);
@@ -95,7 +98,7 @@ int APaho_Manager_Async::MessageArrived(void* CallbackContext, char* TopicName, 
 
 void APaho_Manager_Async::ConnectionLost(void* CallbackContext, char* Cause)
 {
-	const FString CauseStr = StringCast<TCHAR>(Cause).Get();
+	const FString CauseStr = StringCast<UTF8CHAR>(Cause).Get();
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, CauseStr]()
 	{
@@ -117,10 +120,10 @@ void APaho_Manager_Async::ConnectionLost(void* CallbackContext, char* Cause)
 void APaho_Manager_Async::OnConnect(void* CallbackContext, MQTTAsync_successData* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("MQTT_Version", FString::FromInt(Response->alt.connect.MQTTVersion));
-	Out_Result.JsonObject->SetStringField("Session_Present", FString::FromInt(Response->alt.connect.sessionPresent));
-	Out_Result.JsonObject->SetStringField("Server_Uri", StringCast<TCHAR>(Response->alt.connect.serverURI).Get());
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("MQTT_Version", Response->alt.connect.MQTTVersion);
+	Out_Result.JsonObject->SetNumberField("Session_Present", Response->alt.connect.sessionPresent);
+	Out_Result.JsonObject->SetStringField("Server_Uri", StringCast<UTF8CHAR>(Response->alt.connect.serverURI).Get());
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -138,8 +141,8 @@ void APaho_Manager_Async::OnConnect(void* CallbackContext, MQTTAsync_successData
 void APaho_Manager_Async::OnConnectFailure(void* CallbackContext, MQTTAsync_failureData* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -158,10 +161,10 @@ void APaho_Manager_Async::OnConnectFailure(void* CallbackContext, MQTTAsync_fail
 void APaho_Manager_Async::OnDisconnect(void* CallbackContext, MQTTAsync_successData* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("MQTT_Version", FString::FromInt(Response->alt.connect.MQTTVersion));
-	Out_Result.JsonObject->SetStringField("Session_Present", FString::FromInt(Response->alt.connect.sessionPresent));
-	Out_Result.JsonObject->SetStringField("Server_Uri", StringCast<TCHAR>(Response->alt.connect.serverURI).Get());
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("MQTT_Version", Response->alt.connect.MQTTVersion);
+	Out_Result.JsonObject->SetNumberField("Session_Present", Response->alt.connect.sessionPresent);
+	Out_Result.JsonObject->SetStringField("Server_Uri", StringCast<UTF8CHAR>(Response->alt.connect.serverURI).Get());
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -179,8 +182,8 @@ void APaho_Manager_Async::OnDisconnect(void* CallbackContext, MQTTAsync_successD
 void APaho_Manager_Async::OnDisconnectFailure(void* CallbackContext, MQTTAsync_failureData* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -198,32 +201,21 @@ void APaho_Manager_Async::OnDisconnectFailure(void* CallbackContext, MQTTAsync_f
 
 void APaho_Manager_Async::OnSend(void* CallbackContext, MQTTAsync_successData* Response)
 {
-	const int PayloadLenght = Response->alt.pub.message.payloadlen;
-	void* Payload = Response->alt.pub.message.payload;
-
-	int32 Index = 0;
-	int32 Length = 0x7FFFFFFF;
-
-	if (Index < 0)
-	{
-		Length += Index;
-		Index = 0;
-	}
-
-	if (Length > PayloadLenght - Index)
-	{
-		Length = PayloadLenght - Index;
-	}
-
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
+
+	if (Response->alt.pub.message.payload && Response->alt.pub.message.payloadlen > 0)
+	{
+		const FString PayloadStr = StringCast<UTF8CHAR>((const char*)Response->alt.pub.message.payload).Get();
+		Out_Result.JsonObject->SetStringField("Payload", PayloadStr);
+	}
+
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
 	Out_Result.JsonObject->SetStringField("Topic", Response->alt.pub.destinationName);
-	Out_Result.JsonObject->SetStringField("Dup_Flag", FString::FromInt(Response->alt.pub.message.dup));
-	Out_Result.JsonObject->SetStringField("Message_Id", FString::FromInt(Response->alt.pub.message.msgid));
-	Out_Result.JsonObject->SetStringField("Payload", StringCast<TCHAR>(reinterpret_cast<const ANSICHAR*>((uint8*)Payload + Index), Length).Get());
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(PayloadLenght));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.qos));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.retained));
+	Out_Result.JsonObject->SetNumberField("Dup_Flag", Response->alt.pub.message.dup);
+	Out_Result.JsonObject->SetNumberField("Message_Id", Response->alt.pub.message.msgid);
+	Out_Result.JsonObject->SetNumberField("Payload_Length", Response->alt.pub.message.payloadlen);
+	Out_Result.JsonObject->SetNumberField("Published_QoS", Response->alt.pub.message.qos);
+	Out_Result.JsonObject->SetNumberField("Published_Retained", Response->alt.pub.message.retained);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -241,8 +233,8 @@ void APaho_Manager_Async::OnSend(void* CallbackContext, MQTTAsync_successData* R
 void APaho_Manager_Async::OnSendFailure(void* CallbackContext, MQTTAsync_failureData* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -260,32 +252,21 @@ void APaho_Manager_Async::OnSendFailure(void* CallbackContext, MQTTAsync_failure
 
 void APaho_Manager_Async::OnUnSubscribe(void* CallbackContext, MQTTAsync_successData* Response)
 {
-	const int PayloadLenght = Response->alt.pub.message.payloadlen;
-	void* Payload = Response->alt.pub.message.payload;
-
-	int32 Index = 0;
-	int32 Length = 0x7FFFFFFF;
-
-	if (Index < 0)
-	{
-		Length += Index;
-		Index = 0;
-	}
-
-	if (Length > PayloadLenght - Index)
-	{
-		Length = PayloadLenght - Index;
-	}
-
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
+
+	if (Response->alt.pub.message.payload && Response->alt.pub.message.payloadlen > 0)
+	{
+		const FString PayloadStr = StringCast<UTF8CHAR>((const char*)Response->alt.pub.message.payload).Get();
+		Out_Result.JsonObject->SetStringField("Payload", PayloadStr);
+	}
+
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
 	Out_Result.JsonObject->SetStringField("Topic", Response->alt.pub.destinationName);
-	Out_Result.JsonObject->SetStringField("Dup_Flag", FString::FromInt(Response->alt.pub.message.dup));
-	Out_Result.JsonObject->SetStringField("Message_Id", FString::FromInt(Response->alt.pub.message.msgid));
-	Out_Result.JsonObject->SetStringField("Payload", StringCast<TCHAR>(reinterpret_cast<const ANSICHAR*>((uint8*)Payload + Index), Length).Get());
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(PayloadLenght));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.qos));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.retained));
+	Out_Result.JsonObject->SetNumberField("Dup_Flag", Response->alt.pub.message.dup);
+	Out_Result.JsonObject->SetNumberField("Message_Id", Response->alt.pub.message.msgid);
+	Out_Result.JsonObject->SetNumberField("Payload_Length", Response->alt.pub.message.payloadlen);
+	Out_Result.JsonObject->SetNumberField("Published_QoS", Response->alt.pub.message.qos);
+	Out_Result.JsonObject->SetNumberField("Published_Retained", Response->alt.pub.message.retained);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -303,8 +284,8 @@ void APaho_Manager_Async::OnUnSubscribe(void* CallbackContext, MQTTAsync_success
 void APaho_Manager_Async::OnUnSubscribeFailure(void* CallbackContext, MQTTAsync_failureData* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -322,32 +303,21 @@ void APaho_Manager_Async::OnUnSubscribeFailure(void* CallbackContext, MQTTAsync_
 
 void APaho_Manager_Async::OnSubscribe(void* CallbackContext, MQTTAsync_successData* Response)
 {
-	const int PayloadLenght = Response->alt.pub.message.payloadlen;
-	void* Payload = Response->alt.pub.message.payload;
-
-	int32 Index = 0;
-	int32 Length = 0x7FFFFFFF;
-
-	if (Index < 0)
-	{
-		Length += Index;
-		Index = 0;
-	}
-
-	if (Length > PayloadLenght - Index)
-	{
-		Length = PayloadLenght - Index;
-	}
-
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
+
+	if (Response->alt.pub.message.payload && Response->alt.pub.message.payloadlen > 0)
+	{
+		const FString PayloadStr = StringCast<UTF8CHAR>((const char*)Response->alt.pub.message.payload).Get();
+		Out_Result.JsonObject->SetStringField("Payload", PayloadStr);
+	}
+
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
 	Out_Result.JsonObject->SetStringField("Topic", Response->alt.pub.destinationName);
-	Out_Result.JsonObject->SetStringField("Dup_Flag", FString::FromInt(Response->alt.pub.message.dup));
-	Out_Result.JsonObject->SetStringField("Message_Id", FString::FromInt(Response->alt.pub.message.msgid));
-	Out_Result.JsonObject->SetStringField("Payload", StringCast<TCHAR>(reinterpret_cast<const ANSICHAR*>((uint8*)Payload + Index), Length).Get());
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(PayloadLenght));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.qos));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.retained));
+	Out_Result.JsonObject->SetNumberField("Dup_Flag", Response->alt.pub.message.dup);
+	Out_Result.JsonObject->SetNumberField("Message_Id", Response->alt.pub.message.msgid);
+	Out_Result.JsonObject->SetNumberField("Payload_Length", Response->alt.pub.message.payloadlen);
+	Out_Result.JsonObject->SetNumberField("Published_QoS", Response->alt.pub.message.qos);
+	Out_Result.JsonObject->SetNumberField("Published_Retained", Response->alt.pub.message.retained);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -365,8 +335,8 @@ void APaho_Manager_Async::OnSubscribe(void* CallbackContext, MQTTAsync_successDa
 void APaho_Manager_Async::OnSubscribeFailure(void* CallbackContext, MQTTAsync_failureData* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -389,10 +359,10 @@ void APaho_Manager_Async::OnSubscribeFailure(void* CallbackContext, MQTTAsync_fa
 void APaho_Manager_Async::OnConnect5(void* CallbackContext, MQTTAsync_successData5* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("MQTT_Version", FString::FromInt(Response->alt.connect.MQTTVersion));
-	Out_Result.JsonObject->SetStringField("Session_Present", FString::FromInt(Response->alt.connect.sessionPresent));
-	Out_Result.JsonObject->SetStringField("Server_Uri", StringCast<TCHAR>(Response->alt.connect.serverURI).Get());
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("MQTT_Version", Response->alt.connect.MQTTVersion);
+	Out_Result.JsonObject->SetNumberField("Session_Present", Response->alt.connect.sessionPresent);
+	Out_Result.JsonObject->SetStringField("Server_Uri", StringCast<UTF8CHAR>(Response->alt.connect.serverURI).Get());
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -410,8 +380,8 @@ void APaho_Manager_Async::OnConnect5(void* CallbackContext, MQTTAsync_successDat
 void APaho_Manager_Async::OnConnectFailure5(void* CallbackContext, MQTTAsync_failureData5* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -430,10 +400,10 @@ void APaho_Manager_Async::OnConnectFailure5(void* CallbackContext, MQTTAsync_fai
 void APaho_Manager_Async::OnDisconnect5(void* CallbackContext, MQTTAsync_successData5* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("MQTT_Version", FString::FromInt(Response->alt.connect.MQTTVersion));
-	Out_Result.JsonObject->SetStringField("Session_Present", FString::FromInt(Response->alt.connect.sessionPresent));
-	Out_Result.JsonObject->SetStringField("Server_Uri", StringCast<TCHAR>(Response->alt.connect.serverURI).Get());
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("MQTT_Version", Response->alt.connect.MQTTVersion);
+	Out_Result.JsonObject->SetNumberField("Session_Present", Response->alt.connect.sessionPresent);
+	Out_Result.JsonObject->SetStringField("Server_Uri", StringCast<UTF8CHAR>(Response->alt.connect.serverURI).Get());
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -451,8 +421,8 @@ void APaho_Manager_Async::OnDisconnect5(void* CallbackContext, MQTTAsync_success
 void APaho_Manager_Async::OnDisconnectFailure5(void* CallbackContext, MQTTAsync_failureData5* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -470,32 +440,21 @@ void APaho_Manager_Async::OnDisconnectFailure5(void* CallbackContext, MQTTAsync_
 
 void APaho_Manager_Async::OnSend5(void* CallbackContext, MQTTAsync_successData5* Response)
 {
-	const int PayloadLenght = Response->alt.pub.message.payloadlen;
-	void* Payload = Response->alt.pub.message.payload;
-
-	int32 Index = 0;
-	int32 Length = 0x7FFFFFFF;
-
-	if (Index < 0)
-	{
-		Length += Index;
-		Index = 0;
-	}
-
-	if (Length > PayloadLenght - Index)
-	{
-		Length = PayloadLenght - Index;
-	}
-
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
+
+	if (Response->alt.pub.message.payload && Response->alt.pub.message.payloadlen > 0)
+	{
+		const FString PayloadStr = StringCast<UTF8CHAR>((const char*)Response->alt.pub.message.payload).Get();
+		Out_Result.JsonObject->SetStringField("Payload", PayloadStr);
+	}
+
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
 	Out_Result.JsonObject->SetStringField("Topic", Response->alt.pub.destinationName);
-	Out_Result.JsonObject->SetStringField("Dup_Flag", FString::FromInt(Response->alt.pub.message.dup));
-	Out_Result.JsonObject->SetStringField("Message_Id", FString::FromInt(Response->alt.pub.message.msgid));
-	Out_Result.JsonObject->SetStringField("Payload", StringCast<TCHAR>(reinterpret_cast<const ANSICHAR*>((uint8*)Payload + Index), Length).Get());
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(PayloadLenght));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.qos));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.retained));
+	Out_Result.JsonObject->SetNumberField("Dup_Flag", Response->alt.pub.message.dup);
+	Out_Result.JsonObject->SetNumberField("Message_Id", Response->alt.pub.message.msgid);
+	Out_Result.JsonObject->SetNumberField("Payload_Length", Response->alt.pub.message.payloadlen);
+	Out_Result.JsonObject->SetNumberField("Published_QoS", Response->alt.pub.message.qos);
+	Out_Result.JsonObject->SetNumberField("Published_Retained", Response->alt.pub.message.retained);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -513,8 +472,8 @@ void APaho_Manager_Async::OnSend5(void* CallbackContext, MQTTAsync_successData5*
 void APaho_Manager_Async::OnSendFailure5(void* CallbackContext, MQTTAsync_failureData5* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -532,32 +491,21 @@ void APaho_Manager_Async::OnSendFailure5(void* CallbackContext, MQTTAsync_failur
 
 void APaho_Manager_Async::OnUnSubscribe5(void* CallbackContext, MQTTAsync_successData5* Response)
 {
-	const int PayloadLenght = Response->alt.pub.message.payloadlen;
-	void* Payload = Response->alt.pub.message.payload;
-
-	int32 Index = 0;
-	int32 Length = 0x7FFFFFFF;
-
-	if (Index < 0)
-	{
-		Length += Index;
-		Index = 0;
-	}
-
-	if (Length > PayloadLenght - Index)
-	{
-		Length = PayloadLenght - Index;
-	}
-
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
+
+	if (Response->alt.pub.message.payload && Response->alt.pub.message.payloadlen > 0)
+	{
+		const FString PayloadStr = StringCast<UTF8CHAR>((const char*)Response->alt.pub.message.payload).Get();
+		Out_Result.JsonObject->SetStringField("Payload", PayloadStr);
+	}
+
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
 	Out_Result.JsonObject->SetStringField("Topic", Response->alt.pub.destinationName);
-	Out_Result.JsonObject->SetStringField("Dup_Flag", FString::FromInt(Response->alt.pub.message.dup));
-	Out_Result.JsonObject->SetStringField("Message_Id", FString::FromInt(Response->alt.pub.message.msgid));
-	Out_Result.JsonObject->SetStringField("Payload", StringCast<TCHAR>(reinterpret_cast<const ANSICHAR*>((uint8*)Payload + Index), Length).Get());
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(PayloadLenght));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.qos));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.retained));
+	Out_Result.JsonObject->SetNumberField("Dup_Flag", Response->alt.pub.message.dup);
+	Out_Result.JsonObject->SetNumberField("Message_Id", Response->alt.pub.message.msgid);
+	Out_Result.JsonObject->SetNumberField("Payload_Length", Response->alt.pub.message.payloadlen);
+	Out_Result.JsonObject->SetNumberField("Published_QoS", Response->alt.pub.message.qos);
+	Out_Result.JsonObject->SetNumberField("Published_Retained", Response->alt.pub.message.retained);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -575,8 +523,8 @@ void APaho_Manager_Async::OnUnSubscribe5(void* CallbackContext, MQTTAsync_succes
 void APaho_Manager_Async::OnUnSubscribeFailure5(void* CallbackContext, MQTTAsync_failureData5* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
@@ -594,32 +542,21 @@ void APaho_Manager_Async::OnUnSubscribeFailure5(void* CallbackContext, MQTTAsync
 
 void APaho_Manager_Async::OnSubscribe5(void* CallbackContext, MQTTAsync_successData5* Response)
 {
-	const int PayloadLenght = Response->alt.pub.message.payloadlen;
-	void* Payload = Response->alt.pub.message.payload;
-
-	int32 Index = 0;
-	int32 Length = 0x7FFFFFFF;
-
-	if (Index < 0)
-	{
-		Length += Index;
-		Index = 0;
-	}
-
-	if (Length > PayloadLenght - Index)
-	{
-		Length = PayloadLenght - Index;
-	}
-
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
+
+	if (Response->alt.pub.message.payload && Response->alt.pub.message.payloadlen > 0)
+	{
+		const FString PayloadStr = StringCast<UTF8CHAR>((const char*)Response->alt.pub.message.payload).Get();
+		Out_Result.JsonObject->SetStringField("Payload", PayloadStr);
+	}
+
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
 	Out_Result.JsonObject->SetStringField("Topic", Response->alt.pub.destinationName);
-	Out_Result.JsonObject->SetStringField("Dup_Flag", FString::FromInt(Response->alt.pub.message.dup));
-	Out_Result.JsonObject->SetStringField("Message_Id", FString::FromInt(Response->alt.pub.message.msgid));
-	Out_Result.JsonObject->SetStringField("Payload", StringCast<TCHAR>(reinterpret_cast<const ANSICHAR*>((uint8*)Payload + Index), Length).Get());
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(PayloadLenght));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.qos));
-	Out_Result.JsonObject->SetStringField("Payload_Lenght", FString::FromInt(Response->alt.pub.message.retained));
+	Out_Result.JsonObject->SetNumberField("Dup_Flag", Response->alt.pub.message.dup);
+	Out_Result.JsonObject->SetNumberField("Message_Id", Response->alt.pub.message.msgid);
+	Out_Result.JsonObject->SetNumberField("Payload_Length", Response->alt.pub.message.payloadlen);
+	Out_Result.JsonObject->SetNumberField("Published_QoS", Response->alt.pub.message.qos);
+	Out_Result.JsonObject->SetNumberField("Published_Retained", Response->alt.pub.message.retained);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()
 	{
@@ -637,8 +574,8 @@ void APaho_Manager_Async::OnSubscribe5(void* CallbackContext, MQTTAsync_successD
 void APaho_Manager_Async::OnSubscribeFailure5(void* CallbackContext, MQTTAsync_failureData5* Response)
 {
 	FJsonObjectWrapper Out_Result;
-	Out_Result.JsonObject->SetStringField("Token", FString::FromInt(Response->token));
-	Out_Result.JsonObject->SetStringField("Code", FString::FromInt(Response->code));
+	Out_Result.JsonObject->SetNumberField("Token", Response->token);
+	Out_Result.JsonObject->SetNumberField("Code", Response->code);
 	Out_Result.JsonObject->SetStringField("Message", Response->message);
 
 	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Out_Result]()

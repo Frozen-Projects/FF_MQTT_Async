@@ -88,7 +88,7 @@ void APaho_Manager_Async::MQTT_Async_Destroy()
 	}
 }
 
-void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, FPahoClientParams In_Params)
+void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bIsSucessful, FPahoClientParams In_Params)
 {
 	Out_Code.JsonObject->SetStringField("PluginName", "FF_MQTT_Async");
 	Out_Code.JsonObject->SetStringField("FunctionName", TEXT(__FUNCTION__));
@@ -98,6 +98,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, FPahoCli
 	{
 		Details.Add(MakeShared<FJsonValueString>("Client already initialized !"));
 		Out_Code.JsonObject->SetArrayField("Details", Details);
+		bIsSucessful = false;
 		return;
 	}
 
@@ -106,6 +107,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, FPahoCli
 	{
 		Details.Add(MakeShared<FJsonValueString>(ParameterReason));
 		Out_Code.JsonObject->SetArrayField("Details", Details);
+		bIsSucessful = false;
 		return;
 	}
 
@@ -210,6 +212,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, FPahoCli
 
 		Details.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("MQTTAsync_createWithOptions failed with error code %d"), RetVal)));
 		Out_Code.JsonObject->SetArrayField("Details", Details);
+		bIsSucessful = false;
 		return;
 	}
 
@@ -238,6 +241,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, FPahoCli
 
 		Details.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("MQTTAsync_setCallbacks failed with error code %d"), RetVal)));
 		Out_Code.JsonObject->SetArrayField("Details", Details);
+		bIsSucessful = false;
 		return;
 	}
 
@@ -249,6 +253,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, FPahoCli
 
 		Details.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("MQTTAsync_connect failed with error code %d"), RetVal)));
 		Out_Code.JsonObject->SetArrayField("Details", Details);
+		bIsSucessful = false;
 		return;
 	}
 
@@ -257,9 +262,10 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, FPahoCli
 
 	Details.Add(MakeShared<FJsonValueString>("Client initialized successfully."));
 	Out_Code.JsonObject->SetArrayField("Details", Details);
+	bIsSucessful = true;
 }
 
-bool APaho_Manager_Async::MQTT_Async_Publish(FJsonObjectWrapper& Out_Code, FString In_Topic, FString In_Payload, EMQTTQOS In_QoS, int32 In_Retained)
+bool APaho_Manager_Async::MQTT_Async_Publish(FJsonObjectWrapper& Out_Code, FString In_Topic, FString In_Payload, EMQTTQOS In_QoS, bool bIsRetained)
 {
 	Out_Code.JsonObject->SetStringField("PluginName", "FF_MQTT_Async");
 	Out_Code.JsonObject->SetStringField("FunctionName", TEXT(__FUNCTION__));
@@ -279,11 +285,29 @@ bool APaho_Manager_Async::MQTT_Async_Publish(FJsonObjectWrapper& Out_Code, FStri
 		return false;
 	}
 
+	TStringConversion<TStringConvert<FString::ElementType, UTF8CHAR>> Converter = StringCast<UTF8CHAR>(*In_Payload);
+
 	MQTTAsync_message PublishedMessage = MQTTAsync_message_initializer;
-	PublishedMessage.payload = (void*)(const char*)StringCast<UTF8CHAR>(*In_Payload).Get();
-	PublishedMessage.payloadlen = In_Payload.Len();
-	PublishedMessage.qos = 0;
-	PublishedMessage.retained = 0;
+	PublishedMessage.payload = (void*)Converter.Get();
+	PublishedMessage.payloadlen = Converter.Length();
+
+	switch (In_QoS)
+	{
+		case EMQTTQOS::QoS_0:
+			PublishedMessage.qos = 0;
+			break;
+		case EMQTTQOS::QoS_1:
+			PublishedMessage.qos = 1;
+			break;
+		case EMQTTQOS::QoS_2:
+			PublishedMessage.qos = 2;
+			break;
+		default:
+			PublishedMessage.qos = 0;
+			break;
+	}
+
+	PublishedMessage.retained = bIsRetained ? 1 : 0;
 
 	MQTTAsync_responseOptions ResponseOptions = MQTTAsync_responseOptions_initializer;
 	ResponseOptions.context = this;
