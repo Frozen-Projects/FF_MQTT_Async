@@ -23,11 +23,15 @@
 	],
 	"Plugins": [
 		{
-			"Name": "JsonBlueprintUtilities",
+			"Name": "FF_OpenSSL",
 			"Enabled": true
 		},
 		{
 			"Name": "FF_MQTT_Sync",
+			"Enabled": true
+		},
+		{
+			"Name": "JsonBlueprintUtilities",
 			"Enabled": true
 		}
 	]
