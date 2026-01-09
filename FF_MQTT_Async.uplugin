@@ -23,10 +23,6 @@
 	],
 	"Plugins": [
 		{
-			"Name": "FF_OpenSSL",
-			"Enabled": true
-		},
-		{
 			"Name": "FF_MQTT_Sync",
 			"Enabled": true
 		},
