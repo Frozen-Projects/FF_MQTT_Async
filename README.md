@@ -13,7 +13,7 @@ https://github.com/FF-Plugins-Active/FF_MQTT_Sync
 * You need to put on of these protocols before URL ``mqtt://``, ``mqtts://``, ``ws://``, ``wss://``, ``ssl://``
 * You need to put port after the URL.
 * Create your delegate events **before** using ``MQTT Async - Init``
-* Connect your ``publish``, ``subscribe`` and ``unsubscribe`` functions **after** ``OnConnect`` delegate. Because ``MQTT Async - Init`` function's return value will only tell you that connection request has been successfully sent or not. It won't tell you connection has been created or not. ``OnConnect`` delegate will tell you that. So, you have do your data operations, after that delegate triggers.
+* Connect your ``publish``, ``subscribe`` and ``unsubscribe`` functions **after** ``OnConnect`` delegate. Because ``MQTT Async - Init`` function's return value will only tell you that connection request has been successfully sent or not. It won't tell you connection has been created or not. ``OnConnect`` delegate will tell you that. So, you have to do your data operations, after that delegate triggers.
 
 ## DOCUMENTS
 https://blueprintue.com/blueprint/7i2hjgct/
