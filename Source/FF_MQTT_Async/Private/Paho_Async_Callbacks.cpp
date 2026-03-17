@@ -70,13 +70,33 @@ void APaho_Manager_Async::MessageDelivered(void* CallbackContext, MQTTAsync_toke
 
 int APaho_Manager_Async::MessageArrived(void* CallbackContext, char* TopicName, int TopicLenght, MQTTAsync_message* Message)
 {
-	const FString TopicNameStr = StringCast<UTF8CHAR>(TopicName).Get();
-	const FString PayloadStr = StringCast<UTF8CHAR>((const char*)Message->payload).Get();
+	auto StringConverter = [](const char* In_Chars) -> FString
+	{
+		auto Converter = StringCast<UTF8CHAR>(In_Chars);
+		FString RetVal;
+		RetVal.AppendChars(Converter.Get(), Converter.Length());
+		return RetVal;
+	};
+
+	const FString TopicNameStr = StringConverter(TopicName);
+	const FString PayloadStr = StringConverter((const char*)Message->payload);
+
+	FJsonObjectWrapper MessageJson;
+	const bool bIsJsonOk = MessageJson.JsonObjectFromString(PayloadStr);
 
 	FJsonObjectWrapper Arrived;
 	Arrived.JsonObject->SetStringField("TopicName", TopicNameStr);
 	Arrived.JsonObject->SetNumberField("TopicLength", TopicLenght);
-	Arrived.JsonObject->SetStringField("Message", PayloadStr);
+
+	if (bIsJsonOk)
+	{
+		Arrived.JsonObject->SetObjectField("Message", MessageJson.JsonObject);
+	}
+
+	else
+	{
+		Arrived.JsonObject->SetStringField("Message", PayloadStr);
+	}
 
 	MQTTAsync_freeMessage(&Message);
 	MQTTAsync_free(TopicName);
