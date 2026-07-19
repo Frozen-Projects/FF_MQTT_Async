@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Paho_Async_Manager.h"
+#include "Paho_Sync_Manager.h"
 
 // Sets default values
 APaho_Manager_Async::APaho_Manager_Async()
@@ -88,32 +89,30 @@ void APaho_Manager_Async::MQTT_Async_Destroy()
 	}
 }
 
-void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bIsSucessful, FPahoClientParams In_Params)
+bool APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, FPahoClientParams In_Params)
 {
-	Out_Code.JsonObject->SetStringField("PluginName", "FF_MQTT_Async");
-	Out_Code.JsonObject->SetStringField("FunctionName", TEXT(__FUNCTION__));
+	Out_Code.JsonObject->SetStringField(TEXT("PluginName"), TEXT("FF_MQTT_Async"));
+	Out_Code.JsonObject->SetStringField(TEXT("FunctionName"), TEXT(__FUNCTION__));
 	TArray<TSharedPtr<FJsonValue>> Details;
 
 	if (this->Client)
 	{
-		Details.Add(MakeShared<FJsonValueString>("Client already initialized !"));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Details.Add(MakeShared<FJsonValueString>(TEXT("Client already initialized !")));
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	FString ParameterReason;
 	if (!In_Params.IsParamsValid(ParameterReason))
 	{
 		Details.Add(MakeShared<FJsonValueString>(ParameterReason));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
-	FString Protocol = In_Params.GetProtocol();
+	const FString Protocol = In_Params.GetProtocol();
 
 	MQTTAsync Temp_Client = nullptr;
 
@@ -126,7 +125,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bI
 			Create_Options = MQTTAsync_createOptions_initializer;
 			Create_Options.MQTTVersion = MQTTVERSION_3_1;
 
-			if (Protocol == "wss" || Protocol == "ws")
+			if (Protocol == TEXT("wss") || Protocol == TEXT("ws"))
 			{
 				this->Connection_Options = MQTTAsync_connectOptions_initializer_ws;
 			}
@@ -147,7 +146,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bI
 			Create_Options = MQTTAsync_createOptions_initializer;
 			Create_Options.MQTTVersion = MQTTVERSION_3_1_1;
 
-			if (Protocol == "wss" || Protocol == "ws")
+			if (Protocol == TEXT("wss") || Protocol == TEXT("ws"))
 			{
 				this->Connection_Options = MQTTAsync_connectOptions_initializer_ws;
 			}
@@ -168,7 +167,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bI
 			Create_Options = MQTTAsync_createOptions_initializer;
 			Create_Options.MQTTVersion = MQTTVERSION_5;
 
-			if (Protocol == "wss" || Protocol == "ws")
+			if (Protocol == TEXT("wss") || Protocol == TEXT("ws"))
 			{
 				this->Connection_Options = MQTTAsync_connectOptions_initializer5_ws;
 			}
@@ -189,7 +188,7 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bI
 			Create_Options = MQTTAsync_createOptions_initializer;
 			Create_Options.MQTTVersion = MQTTVERSION_3_1_1;
 
-			if (Protocol == "wss" || Protocol == "ws")
+			if (Protocol == TEXT("wss") || Protocol == TEXT("ws"))
 			{
 				this->Connection_Options = MQTTAsync_connectOptions_initializer_ws;
 			}
@@ -213,27 +212,30 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bI
 		MQTTAsync_destroy(&Temp_Client);
 
 		Details.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("MQTTAsync_createWithOptions failed with error code %d"), RetVal)));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
+
+	const std::string Username = APaho_Manager_Sync::FStringToStdString(In_Params.UserName);
+	const std::string Password = APaho_Manager_Sync::FStringToStdString(In_Params.Password);
+	const int32 MQTTVersion = (int32)In_Params.Version;
 
 	this->Connection_Options.context = this;
 	this->Connection_Options.keepAliveInterval = In_Params.KeepAliveInterval;
-	this->Connection_Options.username = (const char*)StringCast<UTF8CHAR>(*In_Params.UserName).Get();
-	this->Connection_Options.password = (const char*)StringCast<UTF8CHAR>(*In_Params.Password).Get();
-	this->Connection_Options.MQTTVersion = (int32)In_Params.Version;
+	this->Connection_Options.username = Username.c_str();
+	this->Connection_Options.password = Password.c_str();
+	this->Connection_Options.MQTTVersion = MQTTVersion;
 	
 	if (this->SetSSLParams(Protocol, In_Params.SSL_Options))
 	{
 		this->Connection_Options.ssl = &this->SSL_Options;
-		Details.Add(MakeShared<FJsonValueString>("SSL parameters set."));
+		Details.Add(MakeShared<FJsonValueString>(TEXT("SSL parameters set.")));
 	}
 
 	else
 	{
-		Details.Add(MakeShared<FJsonValueString>("SSL parameters couldn't be set."));
+		Details.Add(MakeShared<FJsonValueString>(TEXT("SSL parameters couldn't be set.")));
 	}	
 
 	RetVal = MQTTAsync_setCallbacks(Temp_Client, this, APaho_Manager_Async::ConnectionLost, APaho_Manager_Async::MessageArrived, APaho_Manager_Async::MessageDelivered);
@@ -243,10 +245,9 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bI
 		MQTTAsync_destroy(&Temp_Client);
 
 		Details.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("MQTTAsync_setCallbacks failed with error code %d"), RetVal)));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	RetVal = MQTTAsync_connect(Temp_Client, &this->Connection_Options);
@@ -256,42 +257,39 @@ void APaho_Manager_Async::MQTT_Async_Init(FJsonObjectWrapper& Out_Code, bool& bI
 		MQTTAsync_destroy(&Temp_Client);
 
 		Details.Add(MakeShared<FJsonValueString>(FString::Printf(TEXT("MQTTAsync_connect failed with error code %d"), RetVal)));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	this->Client = MoveTemp(Temp_Client);
 	this->Client_Params = In_Params;
 
-	Details.Add(MakeShared<FJsonValueString>("Client initialized successfully."));
-	Out_Code.JsonObject->SetArrayField("Details", Details);
-	bIsSucessful = true;
+	Details.Add(MakeShared<FJsonValueString>(TEXT("Client initialized successfully.")));
+	Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
+	return true;
 }
 
-void APaho_Manager_Async::MQTT_Async_Publish(FJsonObjectWrapper& Out_Code, bool& bIsSucessful, FString In_Topic, FString In_Payload, EMQTTQOS In_QoS, bool bIsRetained)
+bool APaho_Manager_Async::MQTT_Async_Publish(FJsonObjectWrapper& Out_Code, FString In_Topic, FString In_Payload, EMQTTQOS In_QoS, bool bIsRetained)
 {
-	Out_Code.JsonObject->SetStringField("PluginName", "FF_MQTT_Async");
-	Out_Code.JsonObject->SetStringField("FunctionName", TEXT(__FUNCTION__));
+	Out_Code.JsonObject->SetStringField(TEXT("PluginName"), TEXT("FF_MQTT_Async"));
+	Out_Code.JsonObject->SetStringField(TEXT("FunctionName"), TEXT(__FUNCTION__));
 	TArray<TSharedPtr<FJsonValue>> Details;
 
 	if (!this->Client)
 	{
-		Details.Add(MakeShared<FJsonValueString>("Client is not valid !"));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Details.Add(MakeShared<FJsonValueString>(TEXT("Client is not valid !")));
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	if (!MQTTAsync_isConnected(this->Client))
 	{
-		Details.Add(MakeShared<FJsonValueString>("Client is not connected !"));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Details.Add(MakeShared<FJsonValueString>(TEXT("Client is not connected !")));
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	TStringConversion<TStringConvert<FString::ElementType, UTF8CHAR>> Converter = StringCast<UTF8CHAR>(*In_Payload);
@@ -335,35 +333,33 @@ void APaho_Manager_Async::MQTT_Async_Publish(FJsonObjectWrapper& Out_Code, bool&
 	
 	const int RetVal = MQTTAsync_sendMessage(this->Client, (const char*)StringCast<UTF8CHAR>(*In_Topic).Get(), &PublishedMessage, &ResponseOptions);
 
-	const FString ResultString = RetVal == MQTTASYNC_SUCCESS ? "Payload successfully published." : FString::Printf(TEXT("There was a problem while publishing payload with these configurations : %d"), RetVal);
+	const FString ResultString = RetVal == MQTTASYNC_SUCCESS ? TEXT("Payload successfully published.") : FString::Printf(TEXT("There was a problem while publishing payload with these configurations : %d"), RetVal);
 	Details.Add(MakeShared<FJsonValueString>(ResultString));
-	Out_Code.JsonObject->SetArrayField("Details", Details);
+	Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 
-	bIsSucessful = MQTTASYNC_SUCCESS ? true : false;
+	return RetVal == MQTTASYNC_SUCCESS ? true : false;
 }
 
-void APaho_Manager_Async::MQTT_Async_Subscribe(FJsonObjectWrapper& Out_Code, bool& bIsSucessful, FString In_Topic, EMQTTQOS In_QoS)
+bool APaho_Manager_Async::MQTT_Async_Subscribe(FJsonObjectWrapper& Out_Code, FString In_Topic, EMQTTQOS In_QoS)
 {
-	Out_Code.JsonObject->SetStringField("PluginName", "FF_MQTT_Async");
-	Out_Code.JsonObject->SetStringField("FunctionName", TEXT(__FUNCTION__));
+	Out_Code.JsonObject->SetStringField(TEXT("PluginName"), TEXT("FF_MQTT_Async"));
+	Out_Code.JsonObject->SetStringField(TEXT("FunctionName"), TEXT(__FUNCTION__));
 	TArray<TSharedPtr<FJsonValue>> Details;
 
 	if (!this->Client)
 	{
-		Details.Add(MakeShared<FJsonValueString>("Client is not valid !"));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Details.Add(MakeShared<FJsonValueString>(TEXT("Client is not valid !")));
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	if (!MQTTAsync_isConnected(this->Client))
 	{
-		Details.Add(MakeShared<FJsonValueString>("Client is not connected !"));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Details.Add(MakeShared<FJsonValueString>(TEXT("Client is not connected !")));
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"),	 Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	MQTTAsync_responseOptions Response_Options = MQTTAsync_responseOptions_initializer;
@@ -383,35 +379,33 @@ void APaho_Manager_Async::MQTT_Async_Subscribe(FJsonObjectWrapper& Out_Code, boo
 
 	const int RetVal = MQTTAsync_subscribe(this->Client, (const char*)StringCast<UTF8CHAR>(*In_Topic).Get(), (int32)In_QoS, &Response_Options);
 
-	const FString ResultString = RetVal == MQTTASYNC_SUCCESS ? "Topic successfully subscribed." : FString::Printf(TEXT("There was a problem while subscribing topic with these configurations. : %d"), RetVal);
+	const FString ResultString = RetVal == MQTTASYNC_SUCCESS ? TEXT("Topic successfully subscribed.") : FString::Printf(TEXT("There was a problem while subscribing topic with these configurations. : %d"), RetVal);
 	Details.Add(MakeShared<FJsonValueString>(ResultString));
-	Out_Code.JsonObject->SetArrayField("Details", Details);
+	Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 
-	bIsSucessful = MQTTASYNC_SUCCESS ? true : false;
+	return RetVal == MQTTASYNC_SUCCESS ? true : false;
 }
 
-void APaho_Manager_Async::MQTT_Async_Unsubscribe(FJsonObjectWrapper& Out_Code, bool& bIsSucessful, FString In_Topic)
+bool APaho_Manager_Async::MQTT_Async_Unsubscribe(FJsonObjectWrapper& Out_Code, FString In_Topic)
 {
-	Out_Code.JsonObject->SetStringField("PluginName", "FF_MQTT_Async");
-	Out_Code.JsonObject->SetStringField("FunctionName", TEXT(__FUNCTION__));
+	Out_Code.JsonObject->SetStringField(TEXT("PluginName"), TEXT("FF_MQTT_Async"));
+	Out_Code.JsonObject->SetStringField(TEXT("FunctionName"), TEXT(__FUNCTION__));
 	TArray<TSharedPtr<FJsonValue>> Details;
 
 	if (!this->Client)
 	{
-		Details.Add(MakeShared<FJsonValueString>("Client is not valid !"));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Details.Add(MakeShared<FJsonValueString>(TEXT("Client is not valid !")));
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	if (!MQTTAsync_isConnected(this->Client))
 	{
-		Details.Add(MakeShared<FJsonValueString>("Client is not connected !"));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Details.Add(MakeShared<FJsonValueString>(TEXT("Client is not connected !")));
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 		
-		bIsSucessful = false;
-		return;
+		return false;
 	}
 
 	MQTTAsync_responseOptions Response_Options = MQTTAsync_responseOptions_initializer;
@@ -431,9 +425,9 @@ void APaho_Manager_Async::MQTT_Async_Unsubscribe(FJsonObjectWrapper& Out_Code, b
 
 	const int RetVal = MQTTAsync_unsubscribe(this->Client, (const char*)StringCast<UTF8CHAR>(*In_Topic).Get(), &Response_Options);
 
-	const FString ResultString = RetVal == MQTTASYNC_SUCCESS ? "Topic successfully unsubscribed." : FString::Printf(TEXT("There was a problem while unsubscribing topic with these configurations. : %d"), RetVal);
+	const FString ResultString = RetVal == MQTTASYNC_SUCCESS ? TEXT("Topic successfully unsubscribed.") : FString::Printf(TEXT("There was a problem while unsubscribing topic with these configurations. : %d"), RetVal);
 	Details.Add(MakeShared<FJsonValueString>(ResultString));
-	Out_Code.JsonObject->SetArrayField("Details", Details);
+	Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 
-	bIsSucessful = MQTTASYNC_SUCCESS ? true : false;
+	return RetVal == MQTTASYNC_SUCCESS ? true : false;
 }
