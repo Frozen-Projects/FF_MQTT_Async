@@ -71,30 +71,15 @@ void APaho_Manager_Async::MessageDelivered(void* CallbackContext, MQTTAsync_toke
 
 int APaho_Manager_Async::MessageArrived(void* CallbackContext, char* TopicName, int TopicLenght, MQTTAsync_message* Message)
 {
-	const FString TopicNameStr = APaho_Manager_Sync::Utf8ToFString(TopicName);
-	const FString PayloadStr = APaho_Manager_Sync::Utf8ToFString((const char*)Message->payload);
-
-	FJsonObjectWrapper MessageJson;
-	const bool bIsJsonOk = MessageJson.JsonObjectFromString(PayloadStr);
-
-	FJsonObjectWrapper Arrived;
-	Arrived.JsonObject->SetStringField(TEXT("TopicName"), TopicNameStr);
-	Arrived.JsonObject->SetNumberField(TEXT("TopicLength"), TopicLenght);
-
-	if (bIsJsonOk)
-	{
-		Arrived.JsonObject->SetObjectField(TEXT("Message"), MessageJson.JsonObject);
-	}
-
-	else
-	{
-		Arrived.JsonObject->SetStringField(TEXT("Message"), PayloadStr);
-	}
+	FPahoMessage ArrivedMessage;
+	ArrivedMessage.TopicName = APaho_Manager_Sync::Utf8ToFString(TopicName);
+	ArrivedMessage.Payload = TArray<uint8>((uint8*)Message->payload, Message->payloadlen);
+	ArrivedMessage.TopicLength = TopicLenght;
 
 	MQTTAsync_freeMessage(&Message);
 	MQTTAsync_free(TopicName);
 
-	AsyncTask(ENamedThreads::GameThread, [CallbackContext, Arrived]()
+	AsyncTask(ENamedThreads::GameThread, [CallbackContext, ArrivedMessage]()
 	{
 		APaho_Manager_Async* Owner = Cast<APaho_Manager_Async>((APaho_Manager_Async*)CallbackContext);
 
@@ -103,7 +88,7 @@ int APaho_Manager_Async::MessageArrived(void* CallbackContext, char* TopicName, 
 			return;
 		}
 
-		Owner->Delegate_Message_Arrived.Broadcast(Arrived);
+		Owner->Delegate_Message_Arrived.Broadcast(ArrivedMessage);
 	});
 
 	return 1;

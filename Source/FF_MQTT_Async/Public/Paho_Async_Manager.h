@@ -5,8 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 
-// Custom Includes.
-#include "Generic_Includes.h"
+#include "Paho_Delegates.h"
 #include "Paho_Async_Includes.h"
 
 #include "Paho_Async_Manager.generated.h"
@@ -95,7 +94,7 @@ public:
 	FDelegate_Paho_Int Delegate_Message_Delivered;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
-	FDelegate_Paho_Json Delegate_Message_Arrived;
+	FDelegate_Paho_Message Delegate_Message_Arrived;
 
 	UPROPERTY(BlueprintAssignable, Category = "Frozen Forest|MQTT|Client|Paho C")
 	FDelegate_Paho_String Delegate_Connection_Lost;

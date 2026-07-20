@@ -72,15 +72,15 @@ void APaho_Manager_Async::MQTT_Async_Destroy()
 	catch (const std::exception& Exception)
 	{
 		FJsonObjectWrapper Out_Code;
-		Out_Code.JsonObject->SetStringField("PluginName", "FF_MQTT_Async");
-		Out_Code.JsonObject->SetStringField("FunctionName", TEXT(__FUNCTION__));
+		Out_Code.JsonObject->SetStringField(TEXT("PluginName"), TEXT("FF_MQTT_Async"));
+		Out_Code.JsonObject->SetStringField(TEXT("FunctionName"), TEXT(__FUNCTION__));
 		TArray<TSharedPtr<FJsonValue>> Details;
 
 		const FString ExceptionString = StringCast<TCHAR>(Exception.what()).Get();
 		const FString ErrorString = FString::Printf(TEXT("An exception occurred while disconnecting the client: %s"), *ExceptionString);
 		
 		Details.Add(MakeShared<FJsonValueString>(ErrorString));
-		Out_Code.JsonObject->SetArrayField("Details", Details);
+		Out_Code.JsonObject->SetArrayField(TEXT("Details"), Details);
 
 		FString JSON_Output;
 		Out_Code.JsonObjectToString(JSON_Output);
